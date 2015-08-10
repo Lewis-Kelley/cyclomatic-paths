@@ -18,6 +18,13 @@ class CyclomaticTests < Parser::Rewriter
         @parents[0].source="<toplevel>"
         @LOGGING=ENV['LOGGING']
         @MODE=ENV['MODE']||"paths"
+        @BLOCKS=ENV['BLOCKS']
+        if @BLOCKS=="false"
+            @BLOCKS=false
+        end
+        if @BLOCKS.nil? || @BLOCKS==""
+            @BLOCKS=true
+        end
         @DUMP_CFG=ENV['DUMP_CFG']
         @cyclomatic_complexities=[]
         super
@@ -346,21 +353,25 @@ class CyclomaticTests < Parser::Rewriter
     # Needed for ./test/test_helpers/assay_configuration/assay_schema_breaker.rb:break_fields in particular
     # FIXME: does not handle nested blocks, like arr.sort!{|x,y| x.name <=> y.name}.each do |arr|
     def on_block(node)
-        #STDERR.puts "BLOCK: #{node.children}"
-        _send=node.children[0]
-        # TODO: we could inspect the _send's message above and see if it is an iterator.
-        # If so, we could rewrite the code using a loop and restart parsing.
-        obj, msg = *_send
-        arrmethods=[].public_methods(false)
-        _args=node.children[1]
-        _begin=node.children[2]
-        if arrmethods.include?(msg)
-            # iterator method - treat as loop
-            # FIXME: this code does not actually replicate the iterator.
-            log "BLOCK ITERATOR rewritten:"
-            log "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)"
-            source_rewriter=replace(node.loc.expression, "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)")
-            restart(source_rewriter)
+        if @BLOCKS
+            #STDERR.puts "BLOCK: #{node.children}"
+            _send=node.children[0]
+            # TODO: we could inspect the _send's message above and see if it is an iterator.
+            # If so, we could rewrite the code using a loop and restart parsing.
+            obj, msg = *_send
+            arrmethods=[].public_methods(false)
+            _args=node.children[1]
+            _begin=node.children[2]
+            if arrmethods.include?(msg)
+                # iterator method - treat as loop
+                # FIXME: this code does not actually replicate the iterator.
+                log "BLOCK ITERATOR rewritten:"
+                log "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)"
+                source_rewriter=replace(node.loc.expression, "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)")
+                restart(source_rewriter)
+            else
+                super
+            end
         else
             super
         end
