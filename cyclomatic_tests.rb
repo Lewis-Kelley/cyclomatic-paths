@@ -1,4 +1,3 @@
-require('os')
 require_relative("cyclomatic_complexity.rb")
 require_relative("graph_node.rb")
 # plan:

@@ -30,4 +30,6 @@ This will tell you what test paths go through each function in hello.rb.
 
 - I haven't implemented all of Ruby's syntax yet.
 
+- Assignments with short-circuiting like "a = b || c" are counted twice - the tool asks you to investigate whether the "c==false" case could happen, when clearly you don't care about that case.
+
 - The number of paths you get from this tool will likely disagree with the Cyclomatic Complexity metric from your favorite Ruby code quality tool. Whether that is a bug or not is unclear. For instance, rubocop thinks that a rescue block is a decision point, but McCabe is silent on this issue; you can't enter a rescue block through normal control flow. Likewise, rubocop ignores iterator methods like (0..10).each, even though they are really just loops. Is this a bug in rubocop? It's hard to say; iterators don't exist in McCabe's world. The iterators' blocks could alternatively be considered anonymous functions that should have their own CC measure separate from the parent code. Or not.
