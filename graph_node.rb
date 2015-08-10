@@ -217,3 +217,9 @@ class ReturnNode < GraphNode
     end
 end
  
+class VarAssignNode < GraphNode
+    def initialize(node)
+        super(node)
+        @source="#{@ast_node.loc.line}\: #{@ast_node.loc.expression.source}"
+    end
+end
