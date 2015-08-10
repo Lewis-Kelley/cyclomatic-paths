@@ -88,7 +88,6 @@ class CyclomaticTests < Parser::Rewriter
         @parents[-1].next_node=exitnode
         #raise "Too many remaining parents (#{@parents.length}) on stack: #{@parents}" unless @parents.length==1
         #raise "Too many remaining ends (#{@ends.length}) on stack: #{@ends}" unless @ends.length==1
-
         log("End of on_def: #{self} #{@parents} #{@ends} #{@final_process}")
         if @final_process
             @cyclomatic_complexities << CyclomaticComplexity.new(root,exitnode, @MODE)
@@ -217,51 +216,66 @@ class CyclomaticTests < Parser::Rewriter
         # recursively descend
         @parents.push(if_node)
         process(node.children[0])
+        if_condition_node=nil
+        if if_node.next_node != if_node_end
+            # complex condition
+            if_condition_node = if_node.next_node
+            if_node.next_node =  if_node_end
+        end
 
         # Special case: one-liner if assignment, Example:
         #   a = 1 unless b == 1
         # In this case, we need a dummy end.
 
         if if_node.true_node.nil?
-            if_node.true_node=TrueNode.new(node,dummy)
+            if_node.true_node=TrueNode.new(node,if_node,dummy)
+            @parents.push(if_node.true_node)
             process(node.children[1])
             pop_until(@parents,if_node)
             pop_until(@ends,if_node_end)
-            if_node.true_node.next_node=if_node.next_node
-            if_node.next_node=if_node_end
+            #if_node.true_node.next_node=if_node.next_node
+            #if_node.next_node=if_node_end
         end
 
-        # link true/false cases now that the child nodes exist
         true_node=if_node.true_node
-        false_node=FalseNode.new(node,dummy)
+        false_node=FalseNode.new(node,if_node,dummy)
         if_node.false_node=false_node
-        # true node goes to end
 
-        #puts "True child of #{if_node} is #{true_node.children}"
-
-        # false node goes to else or end
         log "ELSE? #{hash[:else]}"
         unless node.children[2].nil?
+            @parents.push(if_node.false_node)
             process(node.children[2])
             pop_until(@parents,if_node)
             pop_until(@ends,if_node_end)
-            if hash[:else] and GraphNode.nodes_by_keyword[hash[:else]]
-                log "ELSE FOUND: #{GraphNode.nodes_by_keyword[hash[:else]]}"
-                false_node.next_node=(GraphNode.nodes_by_keyword[hash[:else]])
-            else
-                false_node.next_node=if_node.next_node
-            end
             if node.children[2].type==:if
                 log "ELSIF: #{GraphNode.nodes_by_keyword[node.children[2].loc.keyword]}"
                 if_node.next_node=GraphNode.nodes_by_keyword[node.children[2].loc.keyword]
-            else
-                if_node.next_node=if_node_end
             end
-            
+
         end
-        #puts "False child of #{if_node} is #{false_node.children}"
-        pop_until(@parents,if_node)
-        @parents.pop
+        if if_condition_node
+            # connect dead ends to true/false nodes
+            dead_nodes=if_condition_node.find_dead_nodes
+            log "   Dead nodes? #{dead_nodes}"
+            dead_nodes.each do |dead_node|
+                if dead_node.kind_of?(TrueNode)
+                    dead_node.next_node=true_node.next_node
+                    log "   Connecting true #{dead_node} to #{dead_node.next_node}"
+                else
+                    dead_node.next_node=false_node.next_node
+                    log "   Connecting false #{dead_node} to #{dead_node.next_node}"
+                end
+            end
+            # blow away the dummy if
+            log "   REPLACING #{if_node} with #{if_condition_node}"
+            pop_until(@parents,if_node)
+            @parents.pop
+            @parents[-1].next_node=if_condition_node
+            if_condition_node.next_node=if_node_end
+        else
+            pop_until(@parents,if_node)
+            @parents.pop
+        end
         if hash[:end]
             # control flow will start from the "end" token from here on in
             pop_until(@ends,if_node_end)
@@ -316,8 +330,9 @@ class CyclomaticTests < Parser::Rewriter
 
 
 
-    # FIXME: treat iterators as decisions (rubocop does NOT do this)
+    # Treat iterators as decisions (rubocop does NOT do this)
     # Needed for ./test/test_helpers/assay_configuration/assay_schema_breaker.rb:break_fields in particular
+    # FIXME: does not handle nested blocks, like arr.sort!{|x,y| x.name <=> y.name}.each do |arr|
     def on_block(node)
         #STDERR.puts "BLOCK: #{node.children}"
         _send=node.children[0]
@@ -430,12 +445,12 @@ class CyclomaticTests < Parser::Rewriter
         @parents.pop
 
         if graph_node.true_node.nil?
-            graph_node.true_node=TrueNode.new(node)
+            graph_node.true_node=TrueNode.new(node,graph_node)
             graph_node.true_node.next_node=graph_node.next_node
             graph_node.next_node=@ends[-2]
         end
 
-        false_node=FalseNode.new(node)
+        false_node=FalseNode.new(node,graph_node)
         graph_node.false_node=false_node
 
         # false node goes to end

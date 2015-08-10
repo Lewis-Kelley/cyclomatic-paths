@@ -7,6 +7,9 @@ class CyclomaticComplexity
         @mode=mode
         @paths=[]
     end
+    def to_s
+        @root.to_s
+    end
     def dump_stack
         @condition_changed=false
         @paths << @stack.dup
@@ -21,7 +24,7 @@ class CyclomaticComplexity
         begin
         if graph_node==@end then dump_stack
         elsif graph_node.class==IfNode
-            #puts "Exploring if node: #{graph_node}"
+            #STDERR.puts "Exploring if node: #{graph_node}"
             if not @negated[graph_node]
                 # visit true node once, then flip condition
                 @condition_changed= (not graph_node.dummy)

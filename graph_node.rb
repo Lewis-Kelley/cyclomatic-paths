@@ -90,11 +90,11 @@ class IfNode < GraphNode
 
     def initialize(node,dummy=false)
         super
-        @child = ast_node.children[0]
-        if @child.class!=Symbol
-            @child=ast_node.children[0].loc.expression.source
+        @condition = ast_node.children[0]
+        if @condition.class!=Symbol
+            @condition=ast_node.children[0].loc.expression.source
         end
-        @source="#{@ast_node.loc.expression.line}\: if #{@child}"
+        @source="#{@ast_node.loc.expression.line}\: if #{@condition}"
         @negatable=true
     end
     def to_graph()
@@ -115,19 +115,40 @@ class IfNode < GraphNode
         end
         defs.uniq
     end
+    def find_dead_nodes
+        # Find TrueNodes and FalseNodes that have no next_node;
+        # these nodes are waiting to be linked back into the graph.
+        result=[]
+        if @true_node.next_node==nil
+            result << @true_node
+        elsif @true_node.next_node.kind_of?(IfNode)
+            result.concat(@true_node.next_node.find_dead_nodes)
+        end
+        if @false_node.next_node==nil
+            result << @false_node
+        elsif @false_node.next_node.kind_of?(IfNode)
+            result=result.concat(@false_node.next_node.find_dead_nodes)
+        end
+        result
+    end
 end
 
+# FIXME: not sure that this extension is appropriate
 class TrueNode < IfNode
-    def initialize(node,dummy=false)
-        super
-        @source="#{@ast_node.loc.expression.line}\: #{@child}==true"
+    attr_accessor :parent_if
+    def initialize(node,parent_if,dummy=false)
+        super(node,dummy)
+        @source="#{@ast_node.loc.expression.line}\: #{@condition}==true"
+        @parent_if=parent_if
     end
 end
 
 class FalseNode < IfNode
-    def initialize(node,dummy=false)
-        super
-        @source="#{@ast_node.loc.expression.line}\: #{@child}==false"
+    attr_accessor :parent_if
+    def initialize(node,parent_if,dummy=false)
+        super(node,dummy)
+        @source="#{@ast_node.loc.expression.line}\: #{@condition}==false"
+        @parent_if=parent_if
     end
 end
 
