@@ -29,6 +29,7 @@ class CyclomaticTests < Parser::Rewriter
             function_association=Hash.new
             @cyclomatic_complexities.each do |cc|
                 paths = cc.dump_tests
+                dump_cfg(paths[0][0])
                 _max=0
                 paths.each do |path|
                     function=path[0]
@@ -64,10 +65,10 @@ class CyclomaticTests < Parser::Rewriter
         end
     end
 
-    def dump_cfg()
+    def dump_cfg(root)
         if @DUMP_CFG
-            puts "digraph #{@root.ast_node.children[0]}{"
-            puts @root.to_dot
+            puts "digraph #{root.ast_node.children[0]}{"
+            puts root.to_dot
             puts "}"
         end
     end
@@ -76,18 +77,30 @@ class CyclomaticTests < Parser::Rewriter
         # new graph
         #puts "NEW GRAPH"
         unless @final_process then return end
+        log node.loc.expression.source
         hash= node.loc.to_hash
-        @root=DefNode.new(node)
-        @parents = [@root]
-        # @ends[0] is always the exit point
-        @ends=[EndNode.new(hash[:end])]
+        root=DefNode.new(node)
+        @parents << root
+        exitnode=EndNode.new(hash[:end])
+        @ends << exitnode
         super
         # link exit point
-        @parents[-1].next_node=(@ends[0])
-        dump_cfg
+        @parents[-1].next_node=exitnode
         #raise "Too many remaining parents (#{@parents.length}) on stack: #{@parents}" unless @parents.length==1
         #raise "Too many remaining ends (#{@ends.length}) on stack: #{@ends}" unless @ends.length==1
-        if @final_process then @cyclomatic_complexities << CyclomaticComplexity.new(@root,@ends[0], @MODE) end
+
+        log("End of on_def: #{self} #{@parents} #{@ends} #{@final_process}")
+        if @final_process
+            @cyclomatic_complexities << CyclomaticComplexity.new(root,exitnode, @MODE)
+        end
+        until @parents[-1]==root
+            @parents.pop
+        end
+        @parents.pop
+        until @ends[-1]==exitnode
+            @ends.pop
+        end
+        @ends.pop
     end
 
     def on_defs(node)
@@ -99,15 +112,25 @@ class CyclomaticTests < Parser::Rewriter
         if Symbol==node.children[1].class
             #log( node.inspect)
             #log( "---")
-            @root=DefsNode.new(node)
-            @parents = [@root]
-            # @ends[0] is always the exit point
-            @ends=[EndNode.new(hash[:end])]
+            root=DefsNode.new(node)
+            @parents << root
+            exitnode=EndNode.new(hash[:end])
+            @ends << exitnode
             super
             # link exit point
-            @parents[-1].next_node=(@ends[0])
-            dump_cfg
-            if @final_process then @cyclomatic_complexities << CyclomaticComplexity.new(@root,@ends[0], @MODE) end
+            @parents[-1].next_node=exitnode
+            log("End of on_defs: #{@parents} #{@ends} #{@final_process}")
+            if @final_process
+                @cyclomatic_complexities << CyclomaticComplexity.new(root,exitnode, @MODE)
+            end
+            until @parents[-1]==root
+                @parents.pop
+            end
+            @parents.pop
+            until @ends[-1]==exitnode
+                @ends.pop
+            end
+            @ends.pop
         end
     end
 
@@ -123,6 +146,7 @@ class CyclomaticTests < Parser::Rewriter
 
         # add link to VERY end
         #@parents[-1].children.push(graph_node)
+        # FIXME: what it the return is in the else?
         if @parents[-1].class==IfNode
             @parents[-1].true_node=TrueNode.new(@parents[-1].ast_node)
             @parents[-1].true_node.next_node=graph_node
@@ -136,6 +160,7 @@ class CyclomaticTests < Parser::Rewriter
 
 
         log( "IF STATEMENT")
+        log( node.children)
         log( node.loc.to_hash)
         log( node.loc.expression.source)
 
@@ -152,7 +177,7 @@ class CyclomaticTests < Parser::Rewriter
                 end
                 e
             end
-            newif="(if #{children[0]} then #{children[1]} else #{children[2]} end)"
+            newif="#{if hash[:keyword] then hash[:keyword].source else 'if' end} #{children[0]} then #{children[1]} else #{children[2]} end"
             log("Replaced with: #{newif}")
             restart(replace(node.loc.expression, newif))
         end
@@ -169,29 +194,29 @@ class CyclomaticTests < Parser::Rewriter
         end
 
         dummy=false
-        if node.children[0].type==:begin and node.children[0].children[0].type==:if
-            # The condition is itself an if statement!
-            # This typically arises from and/or rewriting below.
-            # Even if a human wrote this, we are really interested
-            # in the interior conditions as this if must ultimately
-            # return true/false.
-            log("Dummy if node")
-            dummy=true
+        _node=node.children[0]
+        until(not _node.respond_to?(:children) or _node.children[0].nil?)
+            if _node.type==:begin and _node.children[0].type==:if
+                # The condition is itself an if statement!
+                # This typically arises from and/or rewriting below.
+                # Even if a human wrote this, we are really interested
+                # in the interior conditions as this if must ultimately
+                # return true/false.
+                log("Dummy if node")
+                dummy=true
+                break
+            end
+            _node=_node.children[0]
         end
+
 
         if_node=IfNode.new(node,dummy)
         @parents[-1].next_node=(if_node)
-        if_node.next_node=@ends[-1]
-
+        if_node_end=@ends[-1]
+        if_node.next_node=if_node_end
         # recursively descend
         @parents.push(if_node)
-        super(node)
-        popped=@parents.pop()
-        #@parents.pop
-        # while(popped!=if_node)
-        #     if_node.next_node=popped.next_node
-        #     popped=@parents.pop
-        # end
+        process(node.children[0])
 
         # Special case: one-liner if assignment, Example:
         #   a = 1 unless b == 1
@@ -199,8 +224,11 @@ class CyclomaticTests < Parser::Rewriter
 
         if if_node.true_node.nil?
             if_node.true_node=TrueNode.new(node,dummy)
+            process(node.children[1])
+            pop_until(@parents,if_node)
+            pop_until(@ends,if_node_end)
             if_node.true_node.next_node=if_node.next_node
-            if_node.next_node=@ends[-1]
+            if_node.next_node=if_node_end
         end
 
         # link true/false cases now that the child nodes exist
@@ -212,18 +240,42 @@ class CyclomaticTests < Parser::Rewriter
         #puts "True child of #{if_node} is #{true_node.children}"
 
         # false node goes to else or end
-        if hash[:else] and GraphNode.nodes_by_keyword[hash[:else]]
-            false_node.next_node=(GraphNode.nodes_by_keyword[hash[:else]])
-        else
-            false_node.next_node=(@ends[-1])
+        log "ELSE? #{hash[:else]}"
+        unless node.children[2].nil?
+            process(node.children[2])
+            pop_until(@parents,if_node)
+            pop_until(@ends,if_node_end)
+            if hash[:else] and GraphNode.nodes_by_keyword[hash[:else]]
+                log "ELSE FOUND: #{GraphNode.nodes_by_keyword[hash[:else]]}"
+                false_node.next_node=(GraphNode.nodes_by_keyword[hash[:else]])
+            else
+                false_node.next_node=if_node.next_node
+            end
+            if node.children[2].type==:if
+                log "ELSIF: #{GraphNode.nodes_by_keyword[node.children[2].loc.keyword]}"
+                if_node.next_node=GraphNode.nodes_by_keyword[node.children[2].loc.keyword]
+            else
+                if_node.next_node=if_node_end
+            end
+            
         end
         #puts "False child of #{if_node} is #{false_node.children}"
-
+        pop_until(@parents,if_node)
+        @parents.pop
         if hash[:end]
             # control flow will start from the "end" token from here on in
+            pop_until(@ends,if_node_end)
             @parents.push(@ends.pop)
-
         end
+    end
+
+    def pop_until(stack, graph_node)
+        popped=stack[-1]
+        until popped==graph_node
+            stack.pop
+            popped=stack[-1]
+        end
+        popped
     end
 
     def on_and(node)
@@ -232,7 +284,17 @@ class CyclomaticTests < Parser::Rewriter
         # a && b == (if a then if b then true else false end else false end)
         a = node.children[0]
         b = node.children[1]
-        source_rewriter=replace(node.loc.expression, "(if #{a.loc.expression.source} then if #{b.loc.expression.source} then true else false end else false end)")
+        a_source=a.loc.expression.source
+        b_source=b.loc.expression.source
+        # the __PLACEHOLDER__ substitution ensures the intended control flow
+        # see batch_review_helpers.rb:when_read_only
+        if a_source.include? "__PLACEHOLDER__"
+            # this is a series of boolean operators
+            new_source=a_source.gsub("__PLACEHOLDER__","(if #{b_source} then __PLACEHOLDER__ else false end)")
+        else
+            new_source="(if #{a_source} then if #{b_source} then __PLACEHOLDER__ else false end else false end)"
+        end
+        source_rewriter=replace(node.loc.expression, new_source)
         restart(source_rewriter)
     end
 
@@ -240,8 +302,15 @@ class CyclomaticTests < Parser::Rewriter
         super
         a = node.children[0]
         b = node.children[1]
-
-        source_rewriter=replace(node.loc.expression, "(if #{a.loc.expression.source} then true else (if #{b.loc.expression.source} then true else false end) end)")
+        a_source=a.loc.expression.source
+        b_source=b.loc.expression.source
+        if a_source.include? "__PLACEHOLDER__"
+            # this is a series of boolean operators
+            new_source=a_source.gsub("__PLACEHOLDER__","(if #{b_source} then true else __PLACEHOLDER__ end)")
+        else
+            new_source="(if #{a_source} then true else (if #{b_source} then true else __PLACEHOLDER__ end) end)"
+        end
+        source_rewriter=replace(node.loc.expression, new_source)
         restart(source_rewriter)
     end
 
@@ -249,35 +318,41 @@ class CyclomaticTests < Parser::Rewriter
 
     # FIXME: treat iterators as decisions (rubocop does NOT do this)
     # Needed for ./test/test_helpers/assay_configuration/assay_schema_breaker.rb:break_fields in particular
-    # def on_block(node)
-    #     #STDERR.puts "BLOCK: #{node.children}"
-    #     _send=node.children[0]
-    #     # TODO: we could inspect the _send's message above and see if it is an iterator.
-    #     # If so, we could rewrite the code using a loop and restart parsing.
-    #     obj, msg = *_send
-    #     arrmethods=[].public_methods(false)
-    #     _args=node.children[1]
-    #     _begin=node.children[2]
-    #     if arrmethods.include?(msg)
-    #         # iterator method - treat as loop
-    #         # FIXME: this code does not actually replicate the iterator.
-    #         puts "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)"
-    #         source_rewriter=replace(node.loc.expression, "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)")
-    #         restart(source_rewriter)
-    #     else
-    #         super
-    #     end
-    # end
+    def on_block(node)
+        #STDERR.puts "BLOCK: #{node.children}"
+        _send=node.children[0]
+        # TODO: we could inspect the _send's message above and see if it is an iterator.
+        # If so, we could rewrite the code using a loop and restart parsing.
+        obj, msg = *_send
+        arrmethods=[].public_methods(false)
+        _args=node.children[1]
+        _begin=node.children[2]
+        if arrmethods.include?(msg)
+            # iterator method - treat as loop
+            # FIXME: this code does not actually replicate the iterator.
+            log "BLOCK ITERATOR rewritten:"
+            log "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)"
+            source_rewriter=replace(node.loc.expression, "(if #{obj.loc.expression.source}.any? then #{_begin.loc.expression.source} end)")
+            restart(source_rewriter)
+        else
+            super
+        end
+    end
 
     # FIXME: rescue is generally not represented in control flow graphs, so this is hard to figure out
-    # def on_rescue(node)
-    #     # either thrown or not
-    #     code, resbody=*(node.children)
-    #     exceptions, e, res = *resbody
-    #     log("Rewriting rescue as fake if statement")
-    #     source_rewriter=replace(node.loc.expression, "if [#{exceptions.loc.expression.source}].thrown?\n #{res.loc.expression.source}\n else\n #{code.loc.expression.source}\n end")
-    #     restart(source_rewriter)
-    # end
+    def on_rescue(node)
+        # either thrown or not
+        code, resbody=*(node.children)
+        exceptions, e, res = *resbody
+        log "RESCUE: code=#{code} exceptions=#{exceptions} e=#{e} res=#{res}"
+        # handle "rescue e" case
+        exception_string = if exceptions then exceptions.loc.expression.source else "Exception" end
+        res_string = if res then res.loc.expression.source else "nil" end
+        code_string = if code then code.loc.expression.source else "nil" end
+        log("Rewriting rescue as fake if statement")
+        source_rewriter=replace(node.loc.expression, "if [#{exception_string}].thrown?\n #{res_string}\n else\n #{code_string}\n end")
+        restart(source_rewriter)
+    end
 
     def restart(source_rewriter)
         @final_process=false
@@ -306,16 +381,15 @@ class CyclomaticTests < Parser::Rewriter
             if child==nil
                 # just "case"
                 variable=nil
-            elsif child.type==:lvar
+            elsif child.type!=:when
                 # "case var"
                 variable=child.loc.expression.source
             elsif child.type==:when
                 # when cond1, cond2, ...
                 # really an if in disjunctive normal form
-
                 prefix=if variable.nil? then "" else "#{variable} ==" end
 
-                condition=child.children[0].loc.expression.source
+                condition="#{prefix} #{child.children[0].loc.expression.source}"
                 for i in 1...(child.children.length-1)
                     condition= "#{condition} || #{prefix} #{child.children[i].loc.expression.source}"
                 end
@@ -334,9 +408,7 @@ class CyclomaticTests < Parser::Rewriter
                 _if="#{_if} \nelsif #{condition} \n#{bodies[i]} "
             end
         end
-        unless _else.nil?
-            _if="#{_if} \nelse \n#{_else}"
-        end
+        _if="#{_if} \nelse \n#{_else}"
         _if="#{_if} \nend"
         log(_if)
         restart(replace(node.loc.expression, _if))
