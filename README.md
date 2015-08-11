@@ -28,6 +28,12 @@ Suppose in your project directory you have a file called hello.rb. Create a symb
 
 This will tell you what test paths go through each function in hello.rb.
 
+You can also figure out which lines of code are least covered by those paths (an indication of fault proneness):
+
+	MODE=path_analysis ruby-rewrite -l cyclomatic_tests.rb hello.rb
+
+Being computed from the basis paths, lines of code with fractions lower than 1/15 are unlikely to be well tested.
+
 ## Known bugs
 
 - I haven't implemented all of Ruby's syntax yet.
