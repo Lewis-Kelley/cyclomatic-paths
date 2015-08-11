@@ -45,18 +45,26 @@ class Hello
     #     d=if y||z then w else x end
     # end
 
-    def block_test(abc)
-        if abc==1
-            abc=2
-        end
-        [abc,1,2,3].each do |n|
-            puts n
-            if n==3 then abc=n end
-            puts abc
-        end
-        if abc==3
-            puts "abc changed"
-        end
+    # def block_test(abc)
+    #     if abc==1
+    #         abc=2
+    #     end
+    #     [abc,1,2,3].each do |n|
+    #         puts n
+    #         if n==3 then abc=n end
+    #         puts abc
+    #     end
+    #     if abc==3
+    #         puts "abc changed"
+    #     end
+    # end
+
+    def cnf_test(request)
+      #if a == '123' and (b == 'd' or b == 'e') and (!a.include? '.js' or !a.include? '.css')
+      if a == '123' and (b == 'd' or b == 'e') and (!a.include? '.js' or !a.include? '.css')
+        db_set = true
+      end
+      db_set
     end
 
     # def block_test_2(hash, field_schemas)

@@ -10,9 +10,6 @@ class GraphNode
     def self.uid
         @@uid
     end
-    @@nodes=Hash.new
-    @@nodes_by_keyword=Hash.new
-    @@nodes_by_expression=Hash.new
     def self.nodes
         @@nodes
     end
@@ -25,6 +22,11 @@ class GraphNode
     def self.nodes_by_expression
         @@nodes_by_expression
     end
+    def self.reset
+        @@nodes=[]
+        @@nodes_by_keyword=Hash.new
+        @@nodes_by_expression=Hash.new
+    end
     def initialize(node,dummy=false)
         @dummy=dummy
         @ast_node=node
@@ -33,8 +35,9 @@ class GraphNode
         @@uid=@@uid+1
         @@nodes[@id]=self
         if node.respond_to?(:loc)
-            @@nodes_by_keyword[node.loc.to_hash[:keyword]]||=self
-            @@nodes_by_expression[node.loc.to_hash[:expression]]||=self
+            @@nodes_by_keyword[node.loc.keyword]||=self unless node.loc.to_hash[:keyword]==nil
+            #puts "  VALUE? #{@@nodes_by_keyword[node.loc.keyword]}" unless node.loc.to_hash[:keyword]==nil
+            @@nodes_by_expression[node.loc.expression]||=self unless node.loc.to_hash[:expression]==nil
             #puts @@nodes_by_keyword[node.loc.to_hash[:keyword]]
         end
         @parent=nil

@@ -16,6 +16,7 @@ class CyclomaticComplexity
         @testcase=@testcase+1
     end
     def cyclomatic_visit(graph_node)
+        raise "crash me" if caller.length > 500
         if graph_node==nil then return end
         #STDERR.puts "  Exploring: #{graph_node}"
         if not graph_node.dummy then @stack.push(graph_node) end
@@ -39,7 +40,7 @@ class CyclomaticComplexity
         elsif graph_node.next_node==nil && @condition_changed
             # look up stack for a next node
             parent=@stack.reverse.find do |n|
-                n.next_node!=nil and n.next_node != graph_node
+                n.next_node!=nil and n.next_node != graph_node and not @stack.include?(n.next_node)
             end
             #STDERR.puts parent
             if parent and parent.next_node!=@end

@@ -12,7 +12,7 @@ class CyclomaticTests < Parser::Rewriter
 
     def initialize()
         @final_process=true
-        GraphNode.nodes=[]
+        GraphNode.reset
         @ends=[]
         @parents=[GraphNode.new("toplevel")]
         @parents[0].source="<toplevel>"
@@ -25,7 +25,7 @@ class CyclomaticTests < Parser::Rewriter
         if @BLOCKS.nil? || @BLOCKS==""
             @BLOCKS=true
         end
-        @DUMP_CFG=ENV['DUMP_CFG']
+        @DUMP_CFG=ENV['DUMP_CFG']=="true"
         @cyclomatic_complexities=[]
         super
     end
@@ -36,7 +36,6 @@ class CyclomaticTests < Parser::Rewriter
             function_association=Hash.new
             @cyclomatic_complexities.each do |cc|
                 paths = cc.dump_tests
-                dump_cfg(paths[0][0])
                 _max=0
                 paths.each do |path|
                     function=path[0]
@@ -98,6 +97,7 @@ class CyclomaticTests < Parser::Rewriter
         log("End of on_def: #{self} #{@parents} #{@ends} #{@final_process}")
         if @final_process
             @cyclomatic_complexities << CyclomaticComplexity.new(root,exitnode, @MODE)
+            dump_cfg(root)
         end
         until @parents[-1]==root
             @parents.pop
@@ -230,10 +230,6 @@ class CyclomaticTests < Parser::Rewriter
             if_node.next_node =  if_node_end
         end
 
-        # Special case: one-liner if assignment, Example:
-        #   a = 1 unless b == 1
-        # In this case, we need a dummy end.
-
         if if_node.true_node.nil?
             if_node.true_node=TrueNode.new(node,if_node,dummy)
             @parents.push(if_node.true_node)
@@ -243,22 +239,23 @@ class CyclomaticTests < Parser::Rewriter
             #if_node.true_node.next_node=if_node.next_node
             #if_node.next_node=if_node_end
         end
-
         true_node=if_node.true_node
-        false_node=FalseNode.new(node,if_node,dummy)
-        if_node.false_node=false_node
 
-        log "ELSE? #{hash[:else]}"
-        unless node.children[2].nil?
-            @parents.push(if_node.false_node)
-            process(node.children[2])
-            pop_until(@parents,if_node)
-            pop_until(@ends,if_node_end)
-            if node.children[2].type==:if
-                log "ELSIF: #{GraphNode.nodes_by_keyword[node.children[2].loc.keyword]}"
-                if_node.next_node=GraphNode.nodes_by_keyword[node.children[2].loc.keyword]
+        if if_node.false_node.nil?
+            false_node=FalseNode.new(node,if_node,dummy)
+            if_node.false_node=false_node
+
+            log "ELSE? #{hash[:else]}"
+            unless node.children[2].nil?
+                @parents.push(if_node.false_node)
+                process(node.children[2])
+                pop_until(@parents,if_node)
+                pop_until(@ends,if_node_end)
+                if node.children[2].type==:if
+                    log "ELSIF: #{GraphNode.nodes_by_keyword[node.children[2].loc.keyword]}"
+                    if_node.next_node=GraphNode.nodes_by_keyword[node.children[2].loc.keyword]
+                end
             end
-
         end
         if if_condition_node
             # connect dead ends to true/false nodes
@@ -309,11 +306,23 @@ class CyclomaticTests < Parser::Rewriter
         b_source=b.loc.expression.source
         # the __PLACEHOLDER__ substitution ensures the intended control flow
         # see batch_review_helpers.rb:when_read_only
-        if a_source.include? "__PLACEHOLDER__"
-            # this is a series of boolean operators
-            new_source=a_source.gsub("__PLACEHOLDER__","(if #{b_source} then __PLACEHOLDER__ else false end)")
+        if not is_if_condition? or a_source.include? "__ASSGNPLACEHOLDER__"
+            # if this is a var assignment, then the a/b values might not even be boolean!
+            log "Short circuit assignment found: #{node.loc.expression.source}"
+            if a_source.include? "__ASSGNPLACEHOLDER__"
+                # this is a series of boolean operators
+                new_source=a_source.gsub(/else (.*); __ASSGNPLACEHOLDER__/) do |value| "elsif #{$1} then #{$1} else #{b_source}; __ASSGNPLACEHOLDER__" end
+            else
+                new_source="if #{a_source} then #{b_source} else #{a_source}; __ASSGNPLACEHOLDER__ end"
+            end
         else
-            new_source="(if #{a_source} then if #{b_source} then __PLACEHOLDER__ else false end else false end)"
+            # if a_source.include? "__PLACEHOLDER__"
+            #     # this is a series of boolean operators
+            #     new_source=a_source.gsub("__PLACEHOLDER__","(if #{b_source} then __PLACEHOLDER__ else false end)")
+            # else
+            #     new_source="(if #{a_source} then if #{b_source} then __PLACEHOLDER__ else false end else false end)"
+            # end
+            new_source="(if #{a_source} then if #{b_source} then true else false end else false end)"
         end
         source_rewriter=replace(node.loc.expression, new_source)
         restart(source_rewriter)
@@ -326,22 +335,23 @@ class CyclomaticTests < Parser::Rewriter
         a_source=a.loc.expression.source
         b_source=b.loc.expression.source
         log "OR: #{@parents.map do |e| e.class end}" 
-        if parent_vasgn?
+        if not is_if_condition? or a_source.include? "__ASSGNPLACEHOLDER__"
             # if this is a var assignment, then the a/b values might not even be boolean!
             log "Short circuit assignment found: #{node.loc.expression.source}"
-            if a_source.include? "__PLACEHOLDER__"
+            if a_source.include? "__ASSGNPLACEHOLDER__"
                 # this is a series of boolean operators
-                new_source=a_source.gsub(/else (.*); __PLACEHOLDER__/) do |value| "elsif #{$1} then #{$1} else #{b_source}; __PLACEHOLDER__" end
+                new_source=a_source.gsub(/else (.*); __ASSGNPLACEHOLDER__/) do |value| "elsif #{$1} then #{$1} else #{b_source}; __ASSGNPLACEHOLDER__" end
             else
-                new_source="if #{a_source} then #{a_source} else #{b_source}; __PLACEHOLDER__ end"
+                new_source="if #{a_source} then #{a_source} else #{b_source}; __ASSGNPLACEHOLDER__ end"
             end
         else
-            if a_source.include? "__PLACEHOLDER__"
-                # this is a series of boolean operators
-                new_source=a_source.gsub("__PLACEHOLDER__","(if #{b_source} then true else __PLACEHOLDER__ end)")
-            else
-                new_source="(if #{a_source} then true else (if #{b_source} then true else __PLACEHOLDER__ end) end)"
-            end
+            # if a_source.include? "__PLACEHOLDER__"
+            #     # this is a series of boolean operators
+            #     new_source=a_source.gsub("__PLACEHOLDER__","(if #{b_source} then true else __PLACEHOLDER__ end)")
+            # else
+            #     new_source="(if #{a_source} then true else (if #{b_source} then true else __PLACEHOLDER__ end) end)"
+            # end
+            new_source="(if #{a_source} then true else (if #{b_source} then true else false end) end)"
         end
         source_rewriter=replace(node.loc.expression, new_source)
         restart(source_rewriter)
@@ -497,36 +507,28 @@ class CyclomaticTests < Parser::Rewriter
         #log( node.loc.to_hash)
         block=Proc.new{|| super}
         on_loop(node, &block)
-
-
     end
 
-    def parent_vasgn?
-        (0..(@parents.length-1)).to_a.reverse.each do |i|
+    def on_for(node)
+        # true case will execute the loop once, then go to the condition again
+        # false case will go to the explicit end
+        #log( node.loc.to_hash)
+        block=Proc.new{|| super}
+        on_loop(node, &block)
+    end
+
+    def is_if_condition?
+        # return true if there is an if on the stack and there is not a true/false node in between
+        #(0..(@parents.length-1)).to_a.reverse.each do |i|
+        @parents.reverse.each do |i|
             log "   #{i}"
-            if @parents[i].kind_of?(VarAssignNode)
+            if i.kind_of?(TrueNode) || i.kind_of?(FalseNode)
+                return false
+            elsif i.kind_of?(IfNode)
                 return true
             end
         end
         false
     end
-
-    # FIXME: what if the assignment has a legit if in it?
-    # def on_vasgn(node)
-    #     # put dummy node on stack as signal to use different and/or op format
-    #     graph_node=VarAssignNode.new(node)
-    #     @parents.push(graph_node)
-    #     super
-    #     # remove so future ifs are not confused
-    #     _end=@parents[-1]
-    #     pop_until(@parents, graph_node)
-    #     @parents.pop
-    #     @parents[-1].next_node=graph_node.next_node # could be nil; that's OK
-    #     if graph_node.next_node
-    #         # assume inline if
-    #         # inlined if presumably has an end; go from there
-    #         @parents.push(_end)
-    #     end
-    # end
 
 end
