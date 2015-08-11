@@ -20,6 +20,8 @@ I spent a lot of time writing research tools for C++/Java during my Ph.D. studie
 
 Still working on a better way...
 
+Install the gems mentioned in the Gemfile.
+
 Suppose in your project directory you have a file called hello.rb. Create a symbolic link to the three ruby files (cyclomatic_tests.rb, cyclomatic_complexity.rb, graph_node.rb), then run:
 
 	ruby-rewrite -l cyclomatic_tests.rb hello.rb
@@ -31,5 +33,7 @@ This will tell you what test paths go through each function in hello.rb.
 - I haven't implemented all of Ruby's syntax yet.
 
 - The number of paths you get from this tool will likely disagree with the Cyclomatic Complexity metric from your favorite Ruby code quality tool. Whether that is a bug or not is unclear.
--- rubocop ignores iterator methods like (0..10).each, even though they are really just loops. Is this a bug in rubocop? It's hard to say; iterators don't exist in McCabe's world. The iterators' blocks could alternatively be considered anonymous functions that should have their own CC measure separate from the parent code. Or not.
--- rubocop treats "if a or b" as two decisions, but treats "when a,b" as one, even though there are the exact same thing!
+
+	- rubocop ignores iterator methods like (0..10).each, even though they are really just loops. Is this a bug in rubocop? It's hard to say; iterators don't exist in McCabe's world. The iterators' blocks could alternatively be considered anonymous functions that should have their own CC measure separate from the parent code. Or not.
+
+	- rubocop treats "if a or b" as two decisions, but treats "when a,b" as one, even though they are the exact same thing!
