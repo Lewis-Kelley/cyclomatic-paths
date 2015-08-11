@@ -36,6 +36,7 @@ class CyclomaticTests < Parser::Rewriter
             function_association=Hash.new
             @cyclomatic_complexities.each do |cc|
                 paths = cc.dump_tests
+                dump_cfg(paths[0][0])
                 _max=0
                 paths.each do |path|
                     function=path[0]
@@ -97,7 +98,6 @@ class CyclomaticTests < Parser::Rewriter
         log("End of on_def: #{self} #{@parents} #{@ends} #{@final_process}")
         if @final_process
             @cyclomatic_complexities << CyclomaticComplexity.new(root,exitnode, @MODE)
-            dump_cfg(root)
         end
         until @parents[-1]==root
             @parents.pop

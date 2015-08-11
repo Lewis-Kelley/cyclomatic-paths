@@ -46,6 +46,8 @@ class CyclomaticComplexity
             if parent and parent.next_node!=@end
                 #puts parent.inspect
                 #puts next_node
+                # patch this node to beautify the graph
+                graph_node.next_node = parent.next_node
                 cyclomatic_visit(parent.next_node)
             else
                 dump_stack
