@@ -26,11 +26,17 @@ Suppose in your project directory you have a file called hello.rb. Create a symb
 
 	ruby-rewrite -l cyclomatic_tests.rb hello.rb
 
-This will tell you what test paths go through each function in hello.rb.
+This will tell you what test paths go through each function in hello.rb. To help visualize what's going on, you can dump each function's control flow graph:
+
+	DUMP_CFG=true ruby-rewrite -l cyclomatic_tests.rb hello.rb
+
+They will appear in .dot format. You can draw them with dot:
+
+	dot -Tpng cnf_test.dot > cnf_test.png
 
 You can also figure out which lines of code are least covered by those paths (an indication of fault proneness):
 
-	MODE=path_analysis ruby-rewrite -l cyclomatic_tests.rb hello.rb
+	MODE=path_analysis ruby-rewrite -l cyclomatic_tests.rb hello.rb | tr ':' ' ' | sort -k2n,2n
 
 Being computed from the basis paths, lines of code with fractions lower than 1/15 are unlikely to be well tested.
 
