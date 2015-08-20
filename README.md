@@ -44,6 +44,10 @@ You can also figure out which lines of code are least covered by those paths (an
 
 Being computed from the basis paths, lines of code with fractions lower than 1/15 are unlikely to be well tested.
 
+You can also just ask for good-old cyclomatic complexity as measured by my tool:
+
+	MODE=count ruby-rewrite -l cyclomatic_tests.rb hello.rb
+
 ## Known bugs
 
 - I haven't implemented all of Ruby's syntax yet.
