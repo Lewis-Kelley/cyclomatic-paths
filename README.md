@@ -16,11 +16,15 @@ After I get this fully working, what I'd like to do from here is write code inst
 
 I spent a lot of time writing research tools for C++/Java during my Ph.D. studies so I wanted to start something fresh. Also, Indigo likes Ruby.
 
+## Dependencies
+
+- graphviz
+
 ## Execution
 
 Still working on a better way...
 
-Install the gems mentioned in the Gemfile.
+`bundle install` to install the gems mentioned in the Gemfile.
 
 Suppose in your project directory you have a file called hello.rb. Create a symbolic link to the three ruby files (cyclomatic_tests.rb, cyclomatic_complexity.rb, graph_node.rb), then run:
 
