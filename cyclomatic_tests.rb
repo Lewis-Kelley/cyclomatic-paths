@@ -75,7 +75,7 @@ class CyclomaticTests < Parser::Rewriter
     def dump_cfg(root)
         if @DUMP_CFG
             File.open("#{root.ast_node.children[0].to_s}.dot", "w") do |f|
-                f.write "digraph #{root.ast_node.children[0]}{"
+                f.write "digraph #{root.ast_node.children[0].to_s.gsub(/[^a-zA-Z0-9]/,'')}{"
                 f.write root.to_dot
                 f.write "}"
             end
