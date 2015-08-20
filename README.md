@@ -54,6 +54,4 @@ Being computed from the basis paths, lines of code with fractions lower than 1/1
 
 	- rubocop treats "if a or b" as two decisions, but treats "when a,b" as one, even though they are the exact same thing!
 
-- return not handled well yet
-
 - Due to rewriting, the line numbers don't always match the original source code

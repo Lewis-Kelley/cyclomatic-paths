@@ -145,22 +145,19 @@ class CyclomaticTests < Parser::Rewriter
     def on_return(node)
         # prematurely exit
         super
-        # remove link to end
-        #@parents[-1].children.pop
-        @parents[-1].next_node=nil
-
         graph_node=ReturnNode.new(node)
         graph_node.next_node=@ends[0]
+        @parents[-1].next_node=graph_node
 
         # add link to VERY end
         #@parents[-1].children.push(graph_node)
         # FIXME: what it the return is in the else?
-        if @parents[-1].class==IfNode
-            @parents[-1].true_node=TrueNode.new(@parents[-1].ast_node)
-            @parents[-1].true_node.next_node=graph_node
-        else
-            @parents[-1].next_node=graph_node
-        end
+        # if @parents[-1].class==IfNode
+        #     @parents[-1].true_node=TrueNode.new(@parents[-1].ast_node)
+        #     @parents[-1].true_node.next_node=graph_node
+        # else
+        #     @parents[-1].next_node=graph_node
+        # end
     end
 
     def on_if(node)

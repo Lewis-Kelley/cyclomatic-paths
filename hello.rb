@@ -12,8 +12,9 @@ class Hello
     #     what=nil
         
     #     if true # n3
-    #        return
-    #        #puts 'abc'
+    #        puts 'abc'
+    #     else
+    #         return
     #     end # n2
     #     ok="ok" unless abc==1
     #     if abc=='true' # n5
@@ -26,6 +27,17 @@ class Hello
     #         ok
     #     end # n4
     # end # n1
+
+    def return_test(a)
+        if true
+            return
+        else
+            return (if a==1 then a else '2' end)
+        end
+        if WONTFINDME
+            'a'
+        end
+    end
 
     # def crazyloop(abc)
     #     until abc==1000
