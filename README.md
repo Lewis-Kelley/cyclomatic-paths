@@ -49,3 +49,7 @@ Being computed from the basis paths, lines of code with fractions lower than 1/1
 	- rubocop ignores iterator methods like (0..10).each, even though they are really just loops. Is this a bug in rubocop? It's hard to say; iterators don't exist in McCabe's world. The iterators' blocks could alternatively be considered anonymous functions that should have their own CC measure separate from the parent code. Or not.
 
 	- rubocop treats "if a or b" as two decisions, but treats "when a,b" as one, even though they are the exact same thing!
+
+- return not handled well yet
+
+- Due to rewriting, the line numbers don't always match the original source code
