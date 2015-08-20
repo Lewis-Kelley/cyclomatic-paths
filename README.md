@@ -2,7 +2,7 @@
 
 Mark Hays<br/>
 Rose-Hulman Institute of Technology<br/>
-Indigo BioAutomation<br/>
+Indigo bioAutomation<br/>
 
 Everyone has heard of McCabe's Cyclomatic Complexity. It is loosely defined as the number of paths through your code. Fewer paths is better. Depending on who you ask, you want 15, 10, or fewer paths through your code.
 
