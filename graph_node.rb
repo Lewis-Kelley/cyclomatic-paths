@@ -101,7 +101,7 @@ class IfNode < GraphNode
         @negatable=true
     end
     def to_graph()
-        edges=super
+        edges=[]
         unless @false_node.nil? or @true_node.nil?
             edges << "n#{@id} -> n#{@true_node.id}"
             edges << "n#{@id} -> n#{@false_node.id}"
@@ -136,20 +136,28 @@ class IfNode < GraphNode
     end
 end
 
-# FIXME: not sure that this extension is appropriate
-class TrueNode < IfNode
+# FIXME: fix duplication between true/false
+class TrueNode < GraphNode
     attr_accessor :parent_if
     def initialize(node,parent_if,dummy=false)
         super(node,dummy)
+        @condition=ast_node.children[0]
+        if @condition.class!=Symbol
+            @condition=ast_node.children[0].loc.expression.source
+        end
         @source="#{@ast_node.loc.expression.line}\: #{@condition}==true"
         @parent_if=parent_if
     end
 end
 
-class FalseNode < IfNode
+class FalseNode < GraphNode
     attr_accessor :parent_if
     def initialize(node,parent_if,dummy=false)
         super(node,dummy)
+        @condition=ast_node.children[0]
+        if @condition.class!=Symbol
+            @condition=ast_node.children[0].loc.expression.source
+        end
         @source="#{@ast_node.loc.expression.line}\: #{@condition}==false"
         @parent_if=parent_if
     end
