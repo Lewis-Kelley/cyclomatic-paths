@@ -30,10 +30,11 @@ class Hello
 
     def return_test(a)
         if true
-            return
+            #return
         else
             return (if a==1 then a else '2' end)
         end
+        return a
         if WONTFINDME
             'a'
         end

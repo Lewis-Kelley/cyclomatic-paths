@@ -148,16 +148,6 @@ class CyclomaticTests < Parser::Rewriter
         graph_node=ReturnNode.new(node)
         graph_node.next_node=@ends[0]
         @parents[-1].next_node=graph_node
-
-        # add link to VERY end
-        #@parents[-1].children.push(graph_node)
-        # FIXME: what it the return is in the else?
-        # if @parents[-1].class==IfNode
-        #     @parents[-1].true_node=TrueNode.new(@parents[-1].ast_node)
-        #     @parents[-1].true_node.next_node=graph_node
-        # else
-        #     @parents[-1].next_node=graph_node
-        # end
     end
 
     def on_if(node)
@@ -170,6 +160,13 @@ class CyclomaticTests < Parser::Rewriter
         log( node.loc.expression.source)
 
         hash=node.loc.to_hash
+
+
+        if @parents[-1].next_node and @parents[-1].next_node.kind_of?(ReturnNode)
+            log("If statement follows return; skipping")
+            # return folowed by dead code; don't add if to graph
+            return
+        end
 
         if hash[:keyword].source!="elsif" and hash[:end].nil? and not hash[:else] or hash[:question]
             log( "one-liner: #{node.loc.expression.source}")
@@ -213,7 +210,6 @@ class CyclomaticTests < Parser::Rewriter
             end
             _node=_node.children[0]
         end
-
 
         if_node=IfNode.new(node,dummy)
         @parents[-1].next_node=(if_node)
