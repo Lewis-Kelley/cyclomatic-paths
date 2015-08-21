@@ -169,7 +169,7 @@ class CyclomaticTests < Parser::Rewriter
             return
         end
 
-        if hash[:keyword].source!="elsif" and hash[:end].nil? and not hash[:else] or hash[:question]
+        if hash[:question] or hash[:keyword].source!="elsif" and hash[:end].nil? and not hash[:else]
             log( "one-liner: #{node.loc.expression.source}")
             #@ends.push(EndNode.new(node.loc.expression))
             #@ends[-1].source="<implicit end>"
