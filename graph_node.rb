@@ -73,7 +73,7 @@ class GraphNode
         unless @next_node.nil?
             [@next_node].each do |e|
                 node = @@nodes[e.id]
-                edges << "n#{@id} -> n#{e.id}  [style=\"dashed\"]"
+                edges << "n#{@id} -> n#{e.id}"
                 edges.concat(node.to_graph())
             end
         end
