@@ -148,6 +148,7 @@ class CyclomaticTests < Parser::Rewriter
         graph_node=ReturnNode.new(node)
         graph_node.next_node=@ends[0]
         @parents[-1].next_node=graph_node
+        @parents.push(graph_node)
     end
 
     def on_if(node)
@@ -162,7 +163,7 @@ class CyclomaticTests < Parser::Rewriter
         hash=node.loc.to_hash
 
 
-        if @parents[-1].next_node and @parents[-1].next_node.kind_of?(ReturnNode)
+        if @parents[-1].kind_of?(ReturnNode)
             log("If statement follows return; skipping")
             # return folowed by dead code; don't add if to graph
             return
