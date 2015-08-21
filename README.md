@@ -54,6 +54,8 @@ You can also just ask for good-old cyclomatic complexity as measured by my tool:
 
 - The number of paths you get from this tool will likely disagree with the Cyclomatic Complexity metric from your favorite Ruby code quality tool. Whether that is a bug or not is unclear.
 
+	- Path analysis stops on return, ignoring dead code; most tools do not factor the effect of returning into their cc calculations
+
 	- rubocop ignores iterator methods like (0..10).each, even though they are really just loops. Is this a bug in rubocop? It's hard to say; iterators don't exist in McCabe's world. The iterators' blocks could alternatively be considered anonymous functions that should have their own CC measure separate from the parent code. Or not.
 
 	- rubocop treats "if a or b" as two decisions, but treats "when a,b" as one, even though they are the exact same thing!
