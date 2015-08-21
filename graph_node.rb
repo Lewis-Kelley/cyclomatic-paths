@@ -103,15 +103,15 @@ class IfNode < GraphNode
     def to_graph()
         edges=[]
         unless @false_node.nil? or @true_node.nil?
-            edges << "n#{@id} -> n#{@true_node.id}"
-            edges << "n#{@id} -> n#{@false_node.id}"
+            edges << "n#{@id} -> n#{@true_node.id} [color=green, label=\"T\"]"
+            edges << "n#{@id} -> n#{@false_node.id} [color=red, label=\"F\"]"
             edges.concat(@false_node.to_graph)
             edges.concat(@true_node.to_graph)
         end
         edges.uniq
     end
     def to_def()
-        defs=super
+        defs=["n#{@id}[label=\"#{source}\" shape=diamond]"]
         unless @false_node.nil? or @true_node.nil?
             defs.concat(@false_node.to_def)
             defs.concat(@true_node.to_def)
